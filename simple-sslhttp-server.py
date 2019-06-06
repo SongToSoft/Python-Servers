@@ -25,7 +25,7 @@ try:
     from cStringIO import StringIO
 except ImportError:
     from StringIO import StringIO
-from socket import * 
+from socket import *
 
 class SimpleHTTPRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
@@ -42,6 +42,50 @@ class SimpleHTTPRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         if f:
             self.copyfile(f, self.wfile)
             f.close()
+
+    #Handler for the POST requests
+    def do_POST(self):
+        #self.send_response(201, 'Created')
+        self.send_response(200, 'Created')
+        self.end_headers()
+        file = os.path.basename(self.path)
+
+        if self.check_Exist(file) == True:
+            return
+        
+        length = int(self.headers['Content-Length'])
+        with open(file, 'wb') as output_file:
+            output_file.write(self.rfile.read(length))
+
+        request_body = 'Saved "%s"\n' % file
+        self.wfile.write(request_body.encode('utf-8'))
+
+    #Handler for the PUT requests
+    def do_PUT(self):
+        #self.send_response(201, 'Created')
+        self.send_response(200, 'Created')
+        self.end_headers()
+        file = os.path.basename(self.path)
+
+        if self.check_Exist(file) == True:
+            return
+        
+        length = int(self.headers['Content-Length'])
+        with open(file, 'wb') as output_file:
+            output_file.write(self.rfile.read(length))
+
+        request_body = 'Saved "%s"\n' % file
+        self.wfile.write(request_body.encode('utf-8'))
+
+    def check_Exist(self, file):
+        if os.path.exists(file):
+            self.send_response(409, 'Conflict')
+            self.end_headers()
+            request_body = '"%s" already exists\n' % file
+            self.wfile.write(request_body.encode('utf-8'))
+            return True
+        else:
+            return False
 
     def do_HEAD(self):
         """Serve a HEAD request."""
@@ -153,7 +197,6 @@ class SimpleHTTPRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         })
 
 def ssl_wrap_socket(sock, ssl_version=None, keyfile=None, certfile=None, ciphers=None):
-
     # init a context with given version(if any)
     if ssl_version is not None and ssl_version in version_dict:
         # create a new SSL context with specified TLS version
@@ -163,13 +206,13 @@ def ssl_wrap_socket(sock, ssl_version=None, keyfile=None, certfile=None, ciphers
     else:
         # if not specified, default
         sslContext = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-        
+
     if ciphers is not None:
         #if specified, set certain ciphersuite
         sslContext.set_ciphers(ciphers)
         if option_test_switch == 1:
             print "ciphers loaded!! =", ciphers
-    
+
     # server-side must load certfile and keyfile, so no if-else
     sslContext.load_cert_chain(certfile, keyfile)
     print "ssl loaded!! certfile=", certfile, "keyfile=", keyfile
@@ -182,17 +225,20 @@ def ssl_wrap_socket(sock, ssl_version=None, keyfile=None, certfile=None, ciphers
 
 def test(HandlerClass = SimpleHTTPRequestHandler,
          ServerClass = BaseHTTPServer.HTTPServer):
-    HOST = sys.argv[1]
-    PORT = int(sys.argv[2])
-    print("Server running on https://localhost:", PORT)
-    httpd = ServerClass(('localhost', PORT), HandlerClass)
-    httpd.socket = socket(AF_INET, SOCK_STREAM) 
-    httpd.socket.bind((HOST, PORT))
-    httpd.socket.listen(10)
-    httpd.socket = ssl_wrap_socket(httpd.socket, ssl_version = None, keyfile='./ssl/key.pem', certfile='./ssl/certificate.pem', ciphers = None)
-    httpd.serve_forever()
-
-
+    try:
+        HOST = sys.argv[1]
+        PORT = int(sys.argv[2])
+        print("Server running on https://localhost:", PORT)
+        httpd = ServerClass(('localhost', PORT), HandlerClass)
+        httpd.socket = socket(AF_INET, SOCK_STREAM)
+        httpd.socket.bind((HOST, PORT))
+        httpd.socket.listen(10)
+        httpd.socket = ssl_wrap_socket(httpd.socket, ssl_version = None, keyfile='./ssl/key.pem', certfile='./ssl/certificate.pem', ciphers = None)
+        httpd.serve_forever()
+        httpd.socket.close()
+    except KeyboardInterrupt:
+        print " Shutting down the http server"
+        httpd.socket.close()
 
 if __name__ == '__main__':
     test()
